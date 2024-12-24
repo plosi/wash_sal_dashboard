@@ -1,15 +1,13 @@
 from shiny import App, render, reactive, ui
 from shinywidgets import output_widget, render_widget, render_plotly
 
-from pathlib import Path
+import os
 from datetime import datetime, timedelta
 import faicons as fa
 import pandas as pd
 import plotly.express as px
 
 import shiny_app.helpers as hp
-
-app_dir = Path(__file__).parent
 
 advisors = hp.advisors
 countries = hp.countries
@@ -245,7 +243,11 @@ app_ui = ui.page_navbar(
     ## Files Panel
     ui.nav_panel(
         'Files',
-        ui.markdown('download/upload excel from here')
+        ui.markdown('Download the database in excel format'),
+        ui.download_button(
+            id='download_db_xlsx',
+            label='Download',
+        )
     ),
     title='WASH SAL Dashboard',
 )
@@ -884,5 +886,9 @@ def server(input, output, session):
 
         return fig
 
+    @render.download()
+    def download_db_xlsx():
+        path = os.path.join(os.path.dirname(__file__), 'data', 'database.xlsx')
+        return path
 
 app = App(app_ui, server)
