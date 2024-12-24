@@ -7,10 +7,8 @@ import faicons as fa
 import pandas as pd
 import plotly.express as px
 
-import helpers as hp
-# from helpers import advisors, countries
-
 app_dir = Path(__file__).parent
+import app_dir / helpers.py as hp
 
 advisors = hp.advisors
 countries = hp.countries
