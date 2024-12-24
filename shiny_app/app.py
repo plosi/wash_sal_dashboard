@@ -8,15 +8,21 @@ import pandas as pd
 import plotly.express as px
 
 import helpers as hp
-from helpers import advisors, countries#, wash_list#, types, calendar
+# from helpers import advisors, countries
 
 app_dir = Path(__file__).parent
 
+advisors = hp.advisors
+countries = hp.countries
+types = hp.types
+
 calendar = reactive.Value()
 wash_list = reactive.Value()
+country_calls = reactive.Value()
 
 calendar.set(hp.import_calendar())
 wash_list.set(hp.import_wash_list())
+country_calls.set(hp.import_country_calls())
 
 app_ui = ui.page_navbar(
     ## TO DO: personal styles
@@ -49,39 +55,39 @@ app_ui = ui.page_navbar(
                 ui.row(
                     ui.column(
                         4,
-                        ui.markdown('Controls'),
+                        ui.markdown('Add / Delete / Edit'),
                         ui.row(
                             ui.column(
-                                6,
-                                ui.input_action_button(
-                                    id='add_to_calendar',
-                                    label='Add',
-                                    icon=fa.icon_svg('calendar-plus'),
-                                    class_='btn btn-outline-success'
+                                4,
+                                ui.tooltip(
+                                    ui.input_action_button(
+                                        id='add_to_calendar',
+                                        label='',
+                                        icon=fa.icon_svg('calendar-plus'),
+                                        class_='btn btn-outline-success'
+                                    ),
+                                    'Add',
+                                    placement='top'                                    
+                                )
+                            ),
+                            ui.column(
+                                4,
+                                ui.tooltip(
+                                    ui.output_ui('delete_from_calendar'),
+                                    'Delete',
+                                    placement='top'
                                 ),
                             ),
                             ui.column(
-                                6,
-                                ui.input_switch(
-                                    id='edit_calendar',
-                                    label='Enable edit',
-                                    value=False
-                                ),
+                                4,
+                                ui.tooltip(
+                                    ui.output_ui('edit_row'),
+                                    'Edit',
+                                    placement='top'
+                                )
                             ),
                         ),
-                        ui.row(
-                            ui.column(6),
-                            ui.column(6,ui.output_ui('delete_from_calendar')),
-                        ),
-                        ui.row(
-                            ui.column(6),
-                            ui.column(6,ui.output_ui('edit_row')),
-                        ),
-                        # ui.row(
-                        #     ui.column(6),
-                        #     ui.column(6,ui.output_ui('save_changes')),
-                        # ),
-                        # ui.markdown('Filters'),
+                        ui.HTML('<br>'),
                         ui.row(
                             ui.column(
                                 6,
@@ -138,7 +144,11 @@ app_ui = ui.page_navbar(
                     output_widget('plot_allocation_bar'),
                     full_screen=True
                 ),
-                col_widths=(8,4)
+                ui.card(
+                    ui.card_header(ui.HTML('<h1>Data</h1>')),
+                    ui.markdown('Show data table here')
+                ),
+                col_widths=(8,4,12)
             ),
         ),
     ),
@@ -146,13 +156,97 @@ app_ui = ui.page_navbar(
     ## Country Calls Panel
     ui.nav_panel(
         'Country Calls',
-        ui.markdown('hello')
+        ui.layout_columns(
+            ui.card(
+                ui.card_header(ui.HTML('<h1>Call Registry</h1>')),
+                ui.row(
+                    ui.column(
+                        4,
+                        ui.markdown('Add / Delete / Edit'),
+                        ui.row(
+                            ui.column(
+                                4,
+                                ui.tooltip(
+                                    ui.input_action_button(
+                                        id='add_call',
+                                        label='',
+                                        icon=fa.icon_svg('calendar-plus'),
+                                        class_='btn btn-outline-success'
+                                    ),
+                                    'Add',
+                                    placement='top'
+                                ),
+                            ),
+                            ui.column(
+                                4,
+                                ui.tooltip(
+                                    ui.output_ui('delete_call'),
+                                    'Delete',
+                                    placement='top'
+                                )
+                            ),
+                            ui.column(
+                                4,
+                                ui.tooltip(
+                                    ui.output_ui('edit_call_row'),
+                                    'Edit',
+                                    placement='top'
+                                )
+                            ),
+                        ),
+                        ui.HTML('<br>'),
+                        ui.row(
+                            ui.column(
+                                6,
+                                ui.output_ui('call_country_select')
+                            ),
+                        ),
+                        ui.row(
+                            ui.column(
+                                6,
+                                ui.output_ui('call_year_select')
+                            ),
+                        ),
+                    ),
+                    ui.column(
+                        8,
+                        ui.output_data_frame('calls_df'),
+                    )
+                )
+            ),
+            ui.card(
+                ui.card_header(ui.HTML('<h1>Stats</h1>')),
+                ui.row(
+                    ui.column(
+                        4,
+                        ui.output_ui('call_year_select_2'),
+                    ),
+                    ui.column(4),
+                    ui.column(
+                        4,
+                        ui.input_slider(
+                            id='min_calls_slider',
+                            label='Minimum number of calls',
+                            min=1,
+                            max=10,
+                            pre='>=',
+                            ticks=True,
+                            step=3,
+                            value=4
+                        ),
+                    )
+                ),
+                output_widget('plot_bar_calls_bycountry'),
+                full_screen=True
+            ),
+            col_widths=12
+        )
     ),
 
-    ## Capacity Building Panel
+    ## Files Panel
     ui.nav_panel(
-        'Capacity Building',
-        ui.markdown('hello again')
+        'Files',
+        ui.markdown('download/upload excel from here')
     ),
     title='WASH SAL Dashboard',
 )
@@ -188,7 +282,6 @@ def server(input, output, session):
 
     @render_widget
     def plot_calendar():
-        ## TO DO: one day activity doesn't display well
         data = calendar.get()
         filtered_calendar = data[data.advisor.isin(input.calendar_advisor_filter_())]
         ## if remarks is nan it creates an error when plotting (cannot create JSON object from nan)
@@ -227,6 +320,7 @@ def server(input, output, session):
             x_end='end_date',
             y='advisor',
             color='type',
+            color_discrete_map=dict(zip(types, hp.TYPE_PALETTE)),
             hover_name='type',
             hover_data=hover_data,
             text='remarks',
@@ -274,7 +368,7 @@ def server(input, output, session):
             data.sort_index(ascending=False),
             width='fit-content',
             # editable=get_editable_flag(),
-            selection_mode='rows' if get_editable_flag() else 'none',
+            selection_mode='rows',# if get_editable_flag() else 'none',
         )
 
     @render.ui
@@ -283,9 +377,9 @@ def server(input, output, session):
             id='edit_row_',
             label='',
             # width='fit-content',
-            class_='btn btn-outline-danger',
+            class_='btn btn-outline-warning',
             icon=fa.icon_svg('pen-to-square'),
-            disabled= not get_editable_flag()
+            # disabled= not get_editable_flag()
         )
 
     @render.ui
@@ -296,19 +390,8 @@ def server(input, output, session):
                     # width='fit-content',
                     icon=fa.icon_svg('calendar-xmark'),
                     class_='btn btn-outline-danger',
-                    disabled=not get_editable_flag()
+                    # disabled=not get_editable_flag()
                 )
-
-    # @render.ui
-    # def save_changes():
-    #     return ui.input_action_button(
-    #         id='save_changes_',
-    #         label='',
-    #         # width='fit-content',
-    #         class_='btn btn-outline-success',
-    #         icon=fa.icon_svg('floppy-disk'),
-    #         disabled= not get_editable_flag()
-    #     )
     
     @render.ui
     def table_advisor_select():
@@ -361,11 +444,11 @@ def server(input, output, session):
             return
         
         m = ui.modal(
-            hp.EDIT_CAL['advisor'],
-            hp.EDIT_CAL['type'],
-            hp.EDIT_CAL['start_date'],
-            hp.EDIT_CAL['end_date'],
-            hp.EDIT_CAL['remarks'],
+            hp.EDIT_CALENDAR['advisor'],
+            hp.EDIT_CALENDAR['type'],
+            hp.EDIT_CALENDAR['start_date'],
+            hp.EDIT_CALENDAR['end_date'],
+            hp.EDIT_CALENDAR['remarks'],
             ui.div(
                 ui.input_action_button('submit_edit_cal', 'Submit', class_='btn btn-primary'),
                 class_='d-flex justify-content-end'
@@ -406,7 +489,7 @@ def server(input, output, session):
         row_to_edit = original_df[original_df.id == id_in_selected.iloc[0]].iloc[0]
 
         try:
-            updated_row = pd.DataFrame([{k: input[f'edit_{k}']() for k in hp.EDIT_CAL.keys()}])## this is one-row dataframe
+            updated_row = pd.DataFrame([{k: input[f'edit_{k}']() for k in hp.EDIT_CALENDAR.keys()}])## this is one-row dataframe
             ## Make sure that the new dataframe has the same columns order as the original one
             ## and that the dates are datetime objects
             updated_row = updated_row.reindex(columns=original_df.columns)
@@ -417,7 +500,7 @@ def server(input, output, session):
 
             calendar.set(original_df.drop('id', axis=1)) ## calendar reactive value does not have the id column
             ## save the calendar to excel
-            hp.update_calendar(original_df.drop('id', axis=1))
+            hp.update_calendar(original_df)
             ui.notification_show(f'Updated entry for {row_to_edit.advisor}, thank you!', type='message')   
         except Exception:
             ui.notification_show(f'Oops, something went wrong. Retry!', type='error')
@@ -443,28 +526,14 @@ def server(input, output, session):
             ui.notification_show(f'Please select one or more rows to be deleted', type='error')
 
     @reactive.effect
-    @reactive.event(input.save_changes_)
-    def _():
-        try:
-            data = calendar.get().drop(['id'], axis=1)
-            hp.update_calendar(data)
-            ui.notification_show('Your changes have been saved to file.', type='message')
-        except Exception as e:
-            ui.notification_show(f'Something went wrong: {e}', type='error')
-        
-    @reactive.calc
-    def get_editable_flag():
-        return input.edit_calendar()
-    
-    @reactive.effect
     @reactive.event(input.add_to_calendar)
     def _():
         m = ui.modal(
-            hp.ADD_CAL['advisor'],
-            hp.ADD_CAL['type'],
-            hp.ADD_CAL['start_date'],
-            hp.ADD_CAL['end_date'],
-            hp.ADD_CAL['remarks'],
+            hp.ADD_CALENDAR['advisor'],
+            hp.ADD_CALENDAR['type'],
+            hp.ADD_CALENDAR['start_date'],
+            hp.ADD_CALENDAR['end_date'],
+            hp.ADD_CALENDAR['remarks'],
             ui.div(
                 ui.input_action_button('submit_add_cal', 'Submit', class_='btn btn-primary'),
                 class_='d-flex justify-content-end'
@@ -479,7 +548,7 @@ def server(input, output, session):
     def _():
         data = calendar.get()
         try:
-            new_row = pd.DataFrame([{k: input[f'add_{k}']() for k in hp.ADD_CAL.keys()}])
+            new_row = pd.DataFrame([{k: input[f'add_{k}']() for k in hp.ADD_CALENDAR.keys()}])
             ## Make sure that the new dataframe has the same columns order as the original one
             ## and that the dates are datetime objects
             new_row = new_row.reindex(columns=data.columns)
@@ -492,8 +561,8 @@ def server(input, output, session):
             ## save the calendar to excel
             hp.update_calendar(updated_cal)
             ui.notification_show(f'New entry for {input.add_advisor()} added to the calendar, thank you!', type='message')   
-        except Exception:
-            ui.notification_show(f'Oops, something went wrong. Retry!', type='error')
+        except Exception as e:
+            ui.notification_show(f'Oops, something went wrong: {e}. Retry!', type='error')
 
     ##
     ## Calendar - Stats
@@ -521,9 +590,11 @@ def server(input, output, session):
             x='total_busdays',
             y='type',
             color='advisor',
+            color_discrete_map=dict(zip(sorted(advisors.short_name), hp.ADVISOR_PALETTE)),
             barmode='group',
             labels={'type': '', 'advisor':'', 'total_busdays': 'Total business days'}
         )
+        fig.update_layout(legend=dict(y=1.1, orientation='h'))
 
         return fig
 
@@ -533,7 +604,6 @@ def server(input, output, session):
     @render_widget
     def plot_allocation_map():
         filtered_countries = countries[countries.Continent.isin(input.map_region_filter())]
-        palette = ['#4A628A', '#7AB2D3', '#B9E5E8', '#DFF2EB']
 
         hover_data = {
             'ta_focal': False,
@@ -545,16 +615,17 @@ def server(input, output, session):
             data_frame=filtered_countries,
             locations='ISO 3166 alpha3',
             color='ta_focal',
-            color_discrete_sequence=palette,
+            # color_discrete_sequence=hp.ADVISOR_PALETTE,
+            color_discrete_map=dict(zip(sorted(advisors.short_name), hp.ADVISOR_PALETTE)),
             hover_name='CIA Name',
             hover_data=hover_data,
             labels={'ta_focal': 'Focal Point'},
         )
         fig.update_geos(fitbounds='locations')
+        fig.update_layout(legend=dict(y=1.1, orientation='h'))
 
         return fig
-
-
+    
     @render_widget
     def plot_allocation_bar():
         filtered_countries = countries[countries.Continent.isin(input.map_region_filter())]
@@ -563,15 +634,256 @@ def server(input, output, session):
             data_frame=filtered_countries.groupby('ta_focal').agg('count').reset_index(),
             x='ta_focal',
             y='CIA Name',
-            labels={'ta_focal':'','CIA Name':'count'}
+            color='ta_focal',
+            # color_discrete_sequence=hp.ADVISOR_PALETTE,
+            color_discrete_map=dict(zip(sorted(advisors.short_name), hp.ADVISOR_PALETTE)),
+            labels={'ta_focal':'','CIA Name':'Number of countries'}
         )
+
+        fig.update_layout(xaxis={'categoryorder':'total descending'}, showlegend=False)
 
         return fig
 
+    ###
+    ### Country Calls ###
+    ###
+    @render.data_frame
+    def calls_df():
+        tmp = country_calls.get()
+        ## create the id columns to reference when editing
+        tmp['id'] = tmp.index
+        data = tmp.copy()
+        ## filter on the year
+        data = data if input.call_year_select_() == 'All' else data[data.date.dt.year == int(input.call_year_select_())]
+        ## filter on the country
+        data = data if input.call_country_select_() == 'All' else data[data.country==input.call_country_select_()]
+        # ## filter on the type
+        # data = data if input.table_type_select_() == 'All' else data[data.type==input.table_type_select_()]
+        
+        data['date'] = data.date.apply(hp.date_prettify)
 
-    # @render.download(filename='updated_cal.xlsx')
-    # def save_calendar():
-    #     yield calendar_df.data_view().to_excel(excel_writer='openpyxl', index=False, sheet_name='calendar')
+        return render.DataGrid(
+            data.sort_index(ascending=False),
+            width='fit-content',
+            selection_mode='rows'
+        )
+
+    @render.ui
+    def edit_call_row():
+        return ui.input_action_button(
+                id='edit_call_row_',
+                label='',
+                # width='fit-content',
+                class_='btn btn-outline-warning',
+                icon=fa.icon_svg('pen-to-square'),
+                # disabled= not get_editable_flag()
+            )
+            
+    @render.ui
+    def delete_call():
+        return ui.input_action_button(
+                id='delete_call_',
+                label='',
+                # width='fit-content',
+                icon=fa.icon_svg('calendar-xmark'),
+                class_='btn btn-outline-danger',
+                # disabled=not get_editable_flag()
+            )
+                
+    @render.ui
+    def call_country_select():
+        data = country_calls.get()
+        countries = [c for c in data.country.unique()]
+        countries.append('All')
+        return ui.input_select(
+            id='call_country_select_',
+            label='Filter by country:',
+            choices = countries,
+            selected='All',
+            width='150px'
+        )
+    
+    @render.ui
+    def call_year_select():
+        data = country_calls.get()
+        years = [int(yr) for yr in data.date.dt.year.unique()]
+        years.append('All')
+        return ui.input_select(
+            id='call_year_select_',
+            label='Filter by year:',
+            choices = years,
+            selected='All',
+            width='150px'
+        )
+
+    @reactive.effect
+    @reactive.event(input.add_call)
+    def _():
+        m = ui.modal(
+            hp.ADD_CALL['date'],
+            hp.ADD_CALL['country'],
+            hp.ADD_CALL['sal_attendees'],
+            hp.ADD_CALL['country_attendees'],
+            hp.ADD_CALL['description'],
+            ui.div(
+                ui.input_action_button('submit_add_country_call', 'Submit', class_='btn btn-primary'),
+                class_='d-flex justify-content-end'
+            ),
+            easy_close=True,
+            title='New Country Call Entry',
+        )
+        ui.modal_show(m)
+
+    @reactive.effect
+    @reactive.event(input.submit_add_country_call)
+    def _():
+        data = country_calls.get()
+        try:
+            new_row = pd.DataFrame([{k: input[f'add_{k}_call']() for k in hp.ADD_CALL.keys()}])
+            ## Make sure that the new dataframe has the same columns order as the original one
+            ## and that the dates are datetime objects
+            new_row = new_row.reindex(columns=data.columns)
+            new_row['date'] = pd.to_datetime(new_row.date, dayfirst=True, errors='raise', format='%d-%b-%Y')
+            ## add the new row to the existing dataframe and update the reactive value
+            updated_country_calls = pd.concat([data, new_row], ignore_index=True)
+
+            country_calls.set(updated_country_calls)
+            ## save the calendar to excel
+            hp.update_country_calls(updated_country_calls)
+            ui.notification_show(f'New entry for {input.add_country_call()} added to the country calls registry, thank you!', type='message')   
+        except Exception as e:
+            ui.notification_show(f'Oops, something went wrong: {e}. Retry!', type='error')
+
+    @reactive.effect
+    @reactive.event(input.edit_call_row_)
+    def _():
+        ## get the indices of the selected rows in the current view (filtered or unfiltered)
+        selected_rows = calls_df.cell_selection()['rows'] ## this is a tuple
+
+        ## check if you have at least one and only one row selected
+        if len(selected_rows) != 1:
+            ui.notification_show('Please select at least one and only one row for editing', type='error')
+            return
+        
+        m = ui.modal(
+            hp.EDIT_CALL['date'],
+            hp.EDIT_CALL['country'],
+            hp.EDIT_CALL['sal_attendees'],
+            hp.EDIT_CALL['country_attendees'],
+            hp.EDIT_CALL['description'],
+            ui.div(
+                ui.input_action_button('submit_edit_country_call', 'Submit', class_='btn btn-primary'),
+                class_='d-flex justify-content-end'
+            ),
+            easy_close=True,
+            title='Edit Country Call Entry',
+        )
+        
+        ## make a dataframe of the current view (filter or unfiltered)
+        tmp = pd.DataFrame(calls_df.data_view())
+        ## save the id of the one selected row (selected_rows is a tuple with only one element)
+        id_in_selected = tmp.iloc[[int(selected_rows[0])]].id ## this is a series #set(tmp.iloc[[int(r) for r in selected_rows]].id)
+        ## make a dataframe of the original (unfiltered) view
+        original_df = country_calls.get()#pd.DataFrame(calendar_df.data())
+        ## identify the row to edit based on the id
+        row_to_edit = original_df[original_df.id == id_in_selected.iloc[0]].iloc[0]
+
+        ui.update_date('edit_date_call', value=row_to_edit.date)
+        ui.update_select('edit_country_call', selected=row_to_edit.country)
+        ui.update_text('edit_sal_attendees_call', value=row_to_edit.sal_attendees)
+        ui.update_text('edit_country_attendees_call', value=row_to_edit.country_attendees)
+        ui.update_text_area('edit_description_call', value='' if pd.isna(row_to_edit.description) else row_to_edit.description)
+
+        ui.modal_show(m)
+
+    @reactive.effect
+    @reactive.event(input.submit_edit_country_call)
+    def _():
+        ## get the indices of the selected rows in the current view (filtered or unfiltered)
+        selected_rows = calls_df.cell_selection()['rows'] ## this is a tuple
+        ## make a dataframe of the current view (filter or unfiltered)
+        tmp = pd.DataFrame(calls_df.data_view())
+        ## save the id of the one selected row (selected_rows is a tuple with only one element)
+        id_in_selected = tmp.iloc[[int(selected_rows[0])]].id ## this is a series #set(tmp.iloc[[int(r) for r in selected_rows]].id)
+        ## make a dataframe of the original (unfiltered) view
+        original_df = country_calls.get()#pd.DataFrame(calendar_df.data())
+        ## identify the row to edit based on the id
+        row_to_edit = original_df[original_df.id == id_in_selected.iloc[0]].iloc[0]
+
+        try:
+            updated_row = pd.DataFrame([{k: input[f'edit_{k}_call']() for k in hp.EDIT_CALL.keys()}])## this is one-row dataframe
+            ## Make sure that the new dataframe has the same columns order as the original one
+            ## and that the dates are datetime objects
+            updated_row = updated_row.reindex(columns=original_df.columns)
+            updated_row['id'] = row_to_edit.id
+            ## update the row in original df with the updated_row using the index
+            updated_row.set_index('id', inplace=True)
+            original_df.update(updated_row)
+
+            country_calls.set(original_df.drop('id', axis=1)) ## country_calls reactive value does not have the id column
+            ## save the calendar to excel
+            hp.update_country_calls(original_df)
+            ui.notification_show(f'Updated entry for {row_to_edit.country}, thank you!', type='message')   
+        except Exception:
+            ui.notification_show(f'Oops, something went wrong. Retry!', type='error')
+        
+    @reactive.effect
+    @reactive.event(input.delete_call_)
+    def _():
+        ## get the indices of the selected rows in the current view (filtered or unfiltered)
+        selected_rows = calls_df.cell_selection()['rows']
+        tmp = pd.DataFrame(calls_df.data_view())
+        ## save the ids of selected rows into a set
+        ids_in_selected = set(tmp.iloc[[int(r) for r in selected_rows]].id)
+
+        if selected_rows:
+            original_df = calls_df.data()
+            rows_to_drop = original_df[original_df.id.isin(ids_in_selected)].index
+            updated_df = country_calls.get().drop(rows_to_drop, axis=0)
+            country_calls.set(updated_df)
+            ## save the calendar to excel
+            hp.update_country_calls(updated_df)
+            ui.notification_show(f'Removing the following row(s): {[id for id in ids_in_selected]}', type='message')
+        else:
+            ui.notification_show(f'Please select one or more rows to be deleted', type='error')
+
+    @render.ui
+    def call_year_select_2():
+        data = country_calls.get()
+        years = [int(yr) for yr in data.date.dt.year.unique()]
+        years.append('All')
+        return ui.input_select(
+            id='call_year_select_2_',
+            label='Filter by year:',
+            choices = years,
+            selected='All',
+            width='150px'
+        )
+
+    @render_widget
+    def plot_bar_calls_bycountry():
+        year = input.call_year_select_2_()
+        min_calls = int(input.min_calls_slider())
+        tmp = country_calls.get()
+        tmp = tmp.copy()
+        ## group by country and filter by date
+        if year == 'All':
+            df = tmp
+        else:
+            df = tmp[tmp.date.dt.year == int(year)]
+        data = df.groupby(['country']).agg({'sal_attendees':'count'}).reset_index().rename(columns={'sal_attendees':'no_calls'})
+
+        fig = px.bar(
+            data_frame = data[data.no_calls >= min_calls],
+            x='no_calls',
+            y='country',
+            color='no_calls',
+            labels={'country': '', 'no_calls': 'Total number of calls'}
+        )
+
+        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+
+        return fig
 
 
 app = App(app_ui, server)
