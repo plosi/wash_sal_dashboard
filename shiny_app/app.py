@@ -7,7 +7,7 @@ import faicons as fa
 import pandas as pd
 import plotly.express as px
 
-import helpers as hp
+import shiny_app.helpers as hp
 
 advisors = hp.advisors
 countries = hp.countries
@@ -890,6 +890,5 @@ def server(input, output, session):
     def download_db_xlsx():
         path = os.path.join(os.path.dirname(__file__), 'data', 'database.xlsx')
         return path
-
 
 app = App(app_ui, server)
