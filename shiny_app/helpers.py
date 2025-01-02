@@ -19,7 +19,7 @@ func: save edited data from df to csv/db
 app_dir = Path(__file__).parent
 
 # DATA_DIR = app_dir / 'data'
-DATA_FILE = app_dir / 'data' /'database.xlsx'
+DATA_FILE = app_dir / 'data' / 'database.xlsx'
 
 ADVISOR_PALETTE = ['#ef476f', '#ffd166', '#06d6a0', '#118ab2']
 TYPE_PALETTE = ['#ffd300', '#ff0000', '#ff0000', '#d11149', '#ff0000', '#d11149', '#04e762', '#008bf8', '#e5e5e5']
