@@ -37,7 +37,7 @@ def initialize_gspread():
         )
         # Authenticate and create client
         return gspread.authorize(credentials)
-    except FileNotFoundError:
+    except:# FileNotFoundError:
         credentials = {
             "type": "service_account",
             "project_id": "cww-wash-dashboard",
