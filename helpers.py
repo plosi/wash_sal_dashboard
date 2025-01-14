@@ -23,22 +23,7 @@ GS_FILE_ID = '1xn5z6przqQh-jkVt32wXYYu48mgHz9RAD_8BQwAnkEo'
 
 def initialize_gspread():
     """Initialize gspread with service account credentials."""
-    # Define the scope
-    scope = [
-        'https://spreadsheets.google.com/feeds',
-        'https://www.googleapis.com/auth/drive'
-    ]
-
-    try:
-        # Load credentials from service account file
-        credentials = Credentials.from_service_account_file(
-            GS_KEY,
-            scopes=scope
-        )
-        # Authenticate and create client
-        return gspread.authorize(credentials)
-    except:# FileNotFoundError:
-        credentials = {
+    credentials = {
             "type": "service_account",
             "project_id": "cww-wash-dashboard",
             "private_key_id": str(os.getenv('private_key_id')),
@@ -52,7 +37,37 @@ def initialize_gspread():
             "universe_domain": "googleapis.com"
         }
         # Authenticate from dictionary
-        return gspread.service_account_from_dict(credentials)
+    return gspread.service_account_from_dict(credentials)
+    # # Define the scope
+    # scope = [
+    #     'https://spreadsheets.google.com/feeds',
+    #     'https://www.googleapis.com/auth/drive'
+    # ]
+
+    # try:
+    #     # Load credentials from service account file
+    #     credentials = Credentials.from_service_account_file(
+    #         GS_KEY,
+    #         scopes=scope
+    #     )
+    #     # Authenticate and create client
+    #     return gspread.authorize(credentials)
+    # except FileNotFoundError:
+    #     credentials = {
+    #         "type": "service_account",
+    #         "project_id": "cww-wash-dashboard",
+    #         "private_key_id": str(os.getenv('private_key_id')),
+    #         "private_key": str(os.getenv('private_key')),
+    #         "client_email": "cww-wash-dashboard-shiny-app@cww-wash-dashboard.iam.gserviceaccount.com",
+    #         "client_id": "103153184028709897384",
+    #         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    #         "token_uri": "https://oauth2.googleapis.com/token",
+    #         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    #         "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/cww-wash-dashboard-shiny-app%40cww-wash-dashboard.iam.gserviceaccount.com",
+    #         "universe_domain": "googleapis.com"
+    #     }
+    #     # Authenticate from dictionary
+    #     return gspread.service_account_from_dict(credentials)
 
 def get_data_file():
     gs_client = initialize_gspread()
