@@ -41,8 +41,8 @@ def initialize_gspread():
         credentials = {
             "type": "service_account",
             "project_id": "cww-wash-dashboard",
-            "private_key_id": os.getenv('private_key_id'),
-            "private_key": os.getenv('private_key'),
+            "private_key_id": str(os.getenv('private_key_id')),
+            "private_key": str(os.getenv('private_key')),
             "client_email": "cww-wash-dashboard-shiny-app@cww-wash-dashboard.iam.gserviceaccount.com",
             "client_id": "103153184028709897384",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
