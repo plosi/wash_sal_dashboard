@@ -2,10 +2,13 @@ from shiny import App, render, reactive, ui
 from shinywidgets import output_widget, render_widget
 
 import os
+import re
 from datetime import datetime, timedelta
 import faicons as fa
 import pandas as pd
 import plotly.express as px
+import plotly.io as pio
+pio.templates.default = "ggplot2"
 
 import helpers as hp
 
@@ -32,8 +35,8 @@ app_ui = ui.page_navbar(
             ui.card(
                 ui.card_header(ui.HTML('<h1>Calendar</h1>')),
                 ui.row(
-                    ui.column(4, ui.output_ui('calendar_advisor_filter')),
-                    ui.column(1), ## Empty column for nice spacing
+                    ui.column(6, ui.output_ui('calendar_advisor_filter')),
+                    ui.column(2), ## Empty column for nice spacing
                     ui.column(4, ui.output_ui('calendar_date_range')),     
                 ),
                 output_widget('plot_calendar'),
@@ -62,8 +65,8 @@ app_ui = ui.page_navbar(
                 ui.card_header(ui.HTML('<h1>Stats</h1>')),
                 ui.output_ui('select_year'),
                 ui.row(
-                    ui.column(4, ui.output_data_frame('advisor_occupancy_df')),
-                    ui.column(8,
+                    ui.column(5, ui.output_data_frame('advisor_occupancy_df')),
+                    ui.column(7,
                         output_widget('plot_bar_days_bytype'),
                         full_screen=True
                     ),
@@ -97,11 +100,18 @@ app_ui = ui.page_navbar(
                 ),
                 ui.card(
                     ui.card_header(ui.HTML('<h1>Data</h1>')),
-                    ui.markdown('Show data table here')
+                    ui.output_data_frame('countries_df')
+                    # ui.markdown('Show data table here')
                 ),
                 col_widths=(8,4,12)
             ),
         ),
+    ),
+
+    ## Countries Overview Panel
+    ui.nav_panel(
+        'Countries Overview',
+        ui.markdown('Under construction'),
     ),
 
     ## Country Calls Panel
@@ -133,26 +143,41 @@ app_ui = ui.page_navbar(
                         4,
                         ui.output_ui('call_year_select_2'),
                     ),
-                    ui.column(4),
-                    ui.column(
-                        4,
-                        ui.input_slider(
-                            id='min_calls_slider',
-                            label='Minimum number of calls',
-                            min=1,
-                            max=10,
-                            pre='>=',
-                            ticks=True,
-                            step=3,
-                            value=4
-                        ),
-                    )
                 ),
-                output_widget('plot_bar_calls_bycountry'),
-                full_screen=True
+                ui.row(
+                    ui.column(
+                        6,
+                        output_widget('plot_bar_calls_bycountry'),
+                    ),
+                    ui.column(
+                        6,
+                        output_widget('plot_bar_calls_byadvisor'),
+                    ),
+                    full_screen=True
+                    # ui.column(
+                    #     4,
+                    #     ui.input_slider(
+                    #         id='min_calls_slider',
+                    #         label='Minimum number of calls',
+                    #         min=1,
+                    #         max=10,
+                    #         pre='>=',
+                    #         ticks=True,
+                    #         step=3,
+                    #         value=1
+                    #     ),
+                    # )
+                ),
+                
             ),
             col_widths=12
         )
+    ),
+
+    ## Proposals Panel
+    ui.nav_panel(
+        'Proposals',
+        ui.markdown('Under construction'),
     ),
 
     ## Files Panel
@@ -161,11 +186,6 @@ app_ui = ui.page_navbar(
         ui.markdown('Link to the database.'),
         ui.markdown('You can view, print and download the file in excel format.'),
         ui.HTML(f'<a href="{hp.url}" target="_blank">Click here</a>')
-        # ui.markdown('Download the database in excel format'),
-        # ui.download_button(
-        #     id='download_db_xlsx',
-        #     label='Download',
-        # )
     ),
     title='WASH SAL Dashboard',
 )
@@ -193,7 +213,7 @@ def server(input, output, session):
                     id='calendar_date_range_',
                     label='',
                     min=data.start_date.min(),
-                    max=data.start_date.max() + timedelta(weeks=52),
+                    max=datetime.today() + timedelta(weeks=52),
                     value=[datetime.today() - timedelta(weeks=2), datetime.today() + timedelta(weeks=6)],
                     step=14,
                     ticks=True,
@@ -248,12 +268,9 @@ def server(input, output, session):
             range_x=[range_x_start, range_x_end] if range_x_start and range_x_end else None,
             labels={'type':'', 'advisor':''}
         )
-        fig.update_traces(textposition='inside')
-        fig.add_vline(x=datetime.today(), line_dash='dash', line_color='green')
-
         fig.update_xaxes(
             tickformat='%d-%b', dtick=86400000.0*7,
-            # rangeslider_visible=False,
+            rangeslider_visible=False,
             # rangeselector=dict(
             #     buttons=list([
             #         dict(count=1, label='1M', step='month', stepmode='backward'),
@@ -265,6 +282,8 @@ def server(input, output, session):
             #     ])
             # )
         )
+        fig.update_traces(textposition='inside')
+        fig.add_vline(x=datetime.today(), line_dash='dot', line_width=3, opacity=1, line_color='black')
 
         return fig
 
@@ -290,7 +309,8 @@ def server(input, output, session):
         return render.DataGrid(
             data.sort_index(ascending=False),
             width='fit-content',
-            selection_mode='rows'
+            selection_mode='rows',
+            height="300px"
         )
 
     @render.ui
@@ -561,6 +581,20 @@ def server(input, output, session):
 
         return fig
     
+    @render.data_frame
+    def countries_df():
+        data = countries.copy()
+        data.columns = ['Country', 'ISO', 'Continent', 'TA Focal', 'TA Support']
+        # data = data.groupby(['TA Focal'])
+        filtered_data = data[data.Continent.isin(input.map_region_filter())].drop(['ISO'], axis=1)
+
+        return render.DataTable(
+            filtered_data.sort_values(['TA Focal', 'Continent']),
+            width='fit-content',
+            height="300px"
+        )
+
+
     @render_widget
     def plot_allocation_bar():
         filtered_countries = countries[countries.Continent.isin(input.map_region_filter())]
@@ -598,11 +632,10 @@ def server(input, output, session):
         data['date'] = data.date.dt.strftime('%d-%m-%Y')
 
         return render.DataGrid(
-            # data.sort_values(by='date', ascending=False),
-            # data.sort_index(ascending=False),
             data,
             width='fit-content',
-            selection_mode='rows'
+            selection_mode='rows',
+            height="300px"
         )
 
     @render.ui
@@ -687,6 +720,9 @@ def server(input, output, session):
             ## Make sure that the new dataframe has the same columns as the original one and that the dates are datetime objects
             new_row = new_row.reindex(columns=data.columns)
             new_row['date'] = pd.to_datetime(new_row.date, dayfirst=True, errors='raise', format='mixed')
+            ## Split multiple names in sal_attendees into comma separated string
+            new_row['sal_attendees'] = re.sub("[()']", "", ", ".join(map(str, new_row.sal_attendees))).strip(",")
+
             ## Add the new row to the existing dataframe and update the reactive value
             updated_df = pd.concat([data, new_row], ignore_index=True)
             country_calls.set(updated_df)
@@ -785,34 +821,79 @@ def server(input, output, session):
     def call_year_select_2():
         data = country_calls.get()
         years = [int(yr) for yr in data.date.dt.year.unique()]
+        selected_year = max(years)
         years.append('All')
         return ui.input_select(
             id='call_year_select_2_',
             label='Filter by year:',
             choices = years,
-            selected='All',
+            selected=selected_year,
             width='150px'
         )
 
     @render_widget
     def plot_bar_calls_bycountry():
         year = input.call_year_select_2_()
-        min_calls = int(input.min_calls_slider())
+        # min_calls = int(input.min_calls_slider())
         tmp = country_calls.get()
-        tmp = tmp.copy()
         ## group by country and filter by date
         if year == 'All':
             df = tmp
+            period = f"{tmp.date.dt.year.min()} - {tmp.date.dt.year.max()}"
         else:
             df = tmp[tmp.date.dt.year == int(year)]
+            period = year
         data = df.groupby(['country']).agg({'sal_attendees':'count'}).reset_index().rename(columns={'sal_attendees':'no_calls'})
 
         fig = px.bar(
-            data_frame = data[data.no_calls >= min_calls],
+            # data_frame = data[data.no_calls >= min_calls],
+            data_frame = data,
             x='no_calls',
             y='country',
             color='no_calls',
-            labels={'country': '', 'no_calls': 'Total number of calls'}
+            color_continuous_scale='Blues',
+            template="ggplot2",
+            labels={'country': '', 'no_calls': 'Total number of calls'},
+            title=f"Total number of calls by country ({period})"
+        )
+
+        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+
+        return fig
+
+    @render_widget
+    def plot_bar_calls_byadvisor():
+        year = input.call_year_select_2_()
+        tmp = country_calls.get()
+        tmp = tmp.copy()
+
+        ## Transform the sal_attendees column into a column of lists 
+        def sal_attendees_to_list(series):
+            return series.split(', ')
+        
+        tmp['sal_attendees'] = tmp.sal_attendees.apply(sal_attendees_to_list)
+        
+        ## group by advisor and filter by date
+        if year == 'All':
+            df = tmp
+            period = f"{tmp.date.dt.year.min()} - {tmp.date.dt.year.max()}"
+        else:
+            df = tmp[tmp.date.dt.year == int(year)]
+            period = year
+
+        df = df.explode('sal_attendees')
+        data = df.groupby(['sal_attendees']).agg({'country':'count'}).reset_index().rename(columns={'country':'no_calls'})
+
+        fig = px.bar(
+            # data_frame = data[data.no_calls >= min_calls],
+            data_frame = data,
+            x='no_calls',
+            y='sal_attendees',
+            color='no_calls',
+            color_continuous_scale='Reds',
+            template="ggplot2",
+            labels={'sal_attendees': '', 'no_calls': 'Total number of calls'},
+            title=f"Total number of calls by advisor ({period})"
         )
 
         fig.update_layout(yaxis={'categoryorder':'total ascending'})

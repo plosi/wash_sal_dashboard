@@ -12,7 +12,7 @@ from google.oauth2.service_account import Credentials
 # from crud_helpers import CRUDHelper
 
 ### Colour palettes
-ADVISOR_PALETTE = ['#ef476f', '#ffd166', '#06d6a0', '#118ab2']
+ADVISOR_PALETTE = ['#ef476f', '#ffd166', '#FF8A8A', '#118ab2', '#06d6a0']
 TYPE_PALETTE = ['#ffd300', '#ff0000', '#ff0000', '#d11149', '#ff0000', '#d11149', '#04e762', '#008bf8', '#403e3e']
 
 ### LOADING DATA ###
@@ -27,7 +27,7 @@ def initialize_gspread():
             "type": "service_account",
             "project_id": "cww-wash-dashboard",
             "private_key_id": os.getenv('PRIVATE_KEY_ID'),
-            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDfudpjqeJZtx+H\nX1kNqnCz0RPwGYoA1NiI77QG+GOZMHarxW/+YxwgLJFvdJuQWTDa/MrsQgfj7tlg\n2KjFYr4iKsNkIK9LUC1GlIBKS3KBcxO3XGwV2c5VtA6YUhdNhA1P5JWQDcLMSnfl\nFFFfsX/LixYFhqXh4k56PX0UAFFCZtz74hZXJDxhrKFnWxdF6n4Un52tq5xZT07o\ntfbZuYXzlmbHC0bq2+A4oRv3ev3/I5CaIexwaQun/bI2elvI02yEl9ejFNCfxWCJ\nNg3M/P1LDEpuKuncMI95hH1C6tMVsxsqvxAYxuRGtWRfuOcwSfAPurRx+PrzQkM2\ntOovIsThAgMBAAECggEAAhq2/BhgSpqdSV4/ScCOWTOkj83msVevLnkOOQFPuwR0\nnkyf7z0uidsvdkRbFPxQyEOH01ly5m0EBowdKMejLRI4xqWjznYbaeo6S3Cam+75\nmtA7zEgRX7cfCsXdZh9RinyGf12QxTAHYQxMEGXMk10cXLqRr35r4WyYA0bWPNUT\nOiFQWoRuXS0vz6E9guYJIJgbThdb5rf1U/vw3VkeOtXNfZ+8n/LPP5NagliFI4wR\nbK2TcD9rjCqZwLQ8VvRnK/bLpMJgpmj+Ul+LhPlDHK7NVb+23K7tO5BRizsMnJGI\nZ0V4GgCnP5PXlZadOaBGGsWZRP6VOwDxB4QDIMslAQKBgQD5ex88PwAhlqEdf9fy\nzBQWMlwZu2r3TfPlZN/dhA0JllCTvGNgwmuEF1Pxb0KG+IPoXrnKIiHo9vbfCoR6\nfovAzeIj42JizvLN2ZnDMQiz1TEhuz/qnRAMp2ilE1urMeAt9bZC0RlIjL/JLr/6\nFIa5ED1JB61kXB/f5wz6bmfYgQKBgQDlknIjBZGBP0DIApauKiJknIcX/h+8czY5\ncXOvreDHp6yGbNrtolPh+pXVIiAFapIRdShj/qcnBCB6BHyfkcPDi1NdFhgpHx92\nAi29P049SLqhFfGsabQ7tNXmwJy+g2QOVHe2AnPbU1hnYwlAe1uBG7J0pIXlGJTP\n+qJZKUu8YQKBgCQZX7Ss/QzfKeMF266DPyjTEqaaiujL+82mogoAkI5hlLk72jln\nCH2tjnTx/3NeRF/8TO/lrnhyO9icQf0jkH9OizlcLqFThqioououjy7OW3ShDqeZ\nIHhkRO0V9v63kdO0qTHT5c+spherTxYVoETpB6UomjtaZTZVzXfzP82BAoGAPtUL\nGhy/C0HVqChVN0ve5+yTaPSrmPdrguNTR2TunZZ9uLj4XovMK5BbC99wJitZ2R9Y\ns62R8DLH9L1foojRrKZoZZTTfgW/pZvJCv/VmR5bvhT0dTzlEGZZGPPkspvhea6S\nqSUYspGoI3vOn3Bjxf1fpV8WKnLE3/t4DbEowmECgYEAz4oDcsrXpcg4Jx5rmS9o\nb0i2RR3FV2xnDO7i5GNw2iuSvsyGVSBe86Ve/uN8vFs4//0V0jTmQwtHGROu/r8O\nbVn6o9jQANFLatLOG7cnVjiRybM1FVgV9FMY11VT0ErDWBEpgPxEvmAUw5M86/Bo\nVf2dvIMOH9XVhLOfQapaVf8=\n-----END PRIVATE KEY-----\n",
+            "private_key": os.getenv('PRIVATE_KEY'),
             "client_email": "cww-wash-dashboard-shiny-app@cww-wash-dashboard.iam.gserviceaccount.com",
             "client_id": "103153184028709897384",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -36,9 +36,10 @@ def initialize_gspread():
             "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/cww-wash-dashboard-shiny-app%40cww-wash-dashboard.iam.gserviceaccount.com",
             "universe_domain": "googleapis.com"
         }
-        # Authenticate from dictionary
+    # Authenticate from dictionary
     return gspread.service_account_from_dict(credentials)
-    # # Define the scope
+    
+    ## Define the scope
     # scope = [
     #     'https://spreadsheets.google.com/feeds',
     #     'https://www.googleapis.com/auth/drive'
@@ -236,11 +237,17 @@ CALL_FORM = {
         # choices={k:k for k in countries['CIA Name'].sort_values()}
         choices={k:k for k in sorted(countries_list)}
     ),
-    'sal_attendees': ui.input_text(
+    'sal_attendees': ui.input_select(
         id='sal_attendees_call',
-        label='SAL TA',
-        placeholder='comma separated names'
+        label='SAL Attendee(s) (use Ctrl for multiselect)',
+        choices={k:k for k in sorted(advisors.short_name.unique())},#[k for k in sorted(advisors.short_name.unique())],
+        multiple=True
     ),
+    # 'sal_attendees': ui.input_text(
+    #     id='sal_attendees_call',
+    #     label='SAL TA',
+    #     placeholder='comma separated names'
+    # ),
     'country_attendees': ui.input_text(
         id='country_attendees_call',
         label='Country Attendee(s)',
