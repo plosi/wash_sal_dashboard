@@ -15,6 +15,8 @@ import helpers as hp
 advisors = hp.advisors
 countries = hp.countries
 types = hp.types
+risk_matrix = hp.risk_matrix
+programmes = hp.programmes
 
 calendar = reactive.Value()
 wash_list = reactive.Value()
@@ -111,7 +113,35 @@ app_ui = ui.page_navbar(
     ## Countries Overview Panel
     ui.nav_panel(
         'Countries Overview',
-        ui.markdown('Under construction'),
+        ui.card(
+            ui.card_header(ui.HTML('<h1>Capacity / Risk</h1>')),
+            ui.layout_columns(
+                ui.card(
+                    output_widget('risk_matrix_map'),
+                    full_screen=True,
+                ),
+                ui.card(
+                    ui.output_data_frame('risk_matrix_df'),
+                    full_screen=True,
+                ),
+                col_widths=(8,4)
+            ),
+        ),
+        ui.card(
+            ui.card_header(ui.HTML('<h1>Programmes</h1>')),
+            ui.row(
+                ui.column(
+                    4,
+                    ui.output_ui('select_year_start_programmes'),
+                    ui.output_ui('select_year_end_programmes'),
+                    ui.input_switch(id='programmes_donor_switch', label='By Donor')
+                ),
+                ui.column(8, output_widget('map_programmes'))
+            ),
+            ui.row(
+                output_widget('plot_programmes'),
+            )
+        )
     ),
 
     ## Country Calls Panel
@@ -614,6 +644,155 @@ def server(input, output, session):
         return fig
 
     ###
+    ### Countries Overview ###
+    ###
+    @render_widget
+    def risk_matrix_map():
+        matrix_df = risk_matrix
+        countries_df = countries
+        matrix_df['remarks'] = matrix_df.remarks.fillna('-')
+
+        merged = pd.merge(
+            left=matrix_df,
+            right=countries_df[['CIA Name','ISO 3166 alpha3']],
+            left_on='country',
+            right_on='CIA Name',
+            right_index=False,
+        )
+
+        hover_data = {
+            'country': False,
+            'ISO 3166 alpha3': False,
+            'score': False,
+            'Description': merged.description,
+            'Remarks': merged.remarks,
+        }
+
+        fig = px.choropleth(
+            data_frame=merged,
+            locations='ISO 3166 alpha3',
+            color='score',
+            color_continuous_scale='RdYlGn_r',
+            hover_name='country',
+            hover_data=hover_data,
+            labels={'country': 'Country', 'description': 'Description', 'remarks': 'Remarks'},
+            title="Country classification by WASH/Engineering capacity/risk"
+        )
+        fig.update_geos(fitbounds='locations')
+        fig.update_layout(legend=dict(y=1.1, orientation='h'))
+
+        return fig
+
+    @render.data_frame
+    def risk_matrix_df():
+        data = risk_matrix.copy()
+        data.columns = ['Country', 'Score', 'Description', 'Remarks']
+        data = data.sort_values(['Score', 'Country'])
+        data = data.drop(['Score'], axis=1)
+
+        return render.DataTable(
+            data,
+            width='fit-content',
+            height="300px"
+        )
+
+    @render.ui
+    def select_year_start_programmes():
+        data = programmes.copy()
+        # data = data.sort_values(data.end_year)
+        # years = [yr for yr in data.end_year.unique()]
+        
+        return ui.input_select(
+                    id='select_year_start_programmes_',
+                    label='Filter by year (starting):',
+                    choices=[yr for yr in data.start_year.dt.year],
+                    selected=datetime.today().year,
+                    width='200px'
+                )
+
+    @render.ui
+    def select_year_end_programmes():
+        data = programmes.copy()
+        # data = data.sort_values(data.end_year)
+        # years = [yr for yr in data.end_year.unique()]
+        
+        return ui.input_select(
+                    id='select_year_end_programmes_',
+                    label='Filter by year (ending):',
+                    choices=[yr for yr in data.end_year.dt.year],
+                    selected=datetime.today().year,
+                    width='200px'
+                )
+
+    @render_widget
+    def map_programmes():
+        min_year = input.select_year_start_programmes_()
+        max_year = input.select_year_end_programmes_()
+        df = programmes.copy()
+        period = f"{min_year} - {max_year}"
+
+        df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year <= int(max_year))]
+        df = df.groupby(['country','sub_sector']).agg({'code':'count'}).reset_index().rename(columns={'code':'no_programmes'})
+        
+
+        merged = pd.merge(
+            left=df,
+            right=countries[['CIA Name','ISO 3166 alpha3']],
+            left_on='country',
+            right_on='CIA Name',
+            right_index=False,
+        )
+
+        fig = px.scatter_geo(
+            data_frame=merged,
+            locations="ISO 3166 alpha3",
+            # color="continent",
+            hover_name="country",
+            size="no_programmes",
+            projection="natural earth",
+            opacity=1,
+            title=f"WASH/Engineering Programmes ({period})"
+        )
+
+        return fig
+
+    @render_widget
+    def plot_programmes():
+        min_year = input.select_year_start_programmes_()
+        max_year = input.select_year_end_programmes_()
+        
+        donor_switch = input.programmes_donor_switch()
+        df = programmes.copy()
+
+        ## Group by country and filter by date
+        df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year <= int(max_year))]
+        period = f"{min_year} - {max_year}"
+        if not donor_switch:
+            data = df.groupby(['country','sub_sector']).agg({'code':'count'}).reset_index().rename(columns={'code':'no_programmes'})
+            labels = {'country': '', 'no_programmes': 'Total number of programmes', 'sub_sector': 'Sector'}
+            color = 'sub_sector'
+        else:
+            data = df.groupby(['country','donor']).agg({'code':'count'}).reset_index().rename(columns={'code':'no_programmes'})
+            labels = {'country': '', 'no_programmes': 'Total number of programmes', 'donor': 'Donor'}
+            color = 'donor'
+
+        fig = px.bar(
+            data_frame = data,
+            x='country',
+            y='no_programmes',
+            color=color,
+            color_discrete_sequence=px.colors.sequential.Plasma_r,
+            labels=labels,
+            title=f"Total number of programmes with WASH/Engineering component by country ({period})"
+        )
+
+        fig.update_layout(xaxis={'categoryorder':'total descending'})
+        fig.update_xaxes(tickangle=45)
+
+        return fig
+
+
+    ###
     ### Country Calls ###
     ###
     @render.data_frame
@@ -848,16 +1027,20 @@ def server(input, output, session):
         fig = px.bar(
             # data_frame = data[data.no_calls >= min_calls],
             data_frame = data,
-            x='no_calls',
-            y='country',
+            x='country',
+            y='no_calls',
+            # x='no_calls',
+            # y='country',
             color='no_calls',
             color_continuous_scale='Blues',
-            template="ggplot2",
             labels={'country': '', 'no_calls': 'Total number of calls'},
             title=f"Total number of calls by country ({period})"
         )
 
-        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        # fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        fig.update_layout(xaxis={'categoryorder':'total descending'})
+        fig.update_xaxes(tickangle=45)
+        fig.update_coloraxes(showscale=False)
 
         return fig
 
@@ -887,16 +1070,19 @@ def server(input, output, session):
         fig = px.bar(
             # data_frame = data[data.no_calls >= min_calls],
             data_frame = data,
-            x='no_calls',
-            y='sal_attendees',
+            x='sal_attendees',
+            y='no_calls',
+            # x='no_calls',
+            # y='sal_attendees',
             color='no_calls',
             color_continuous_scale='Reds',
-            template="ggplot2",
             labels={'sal_attendees': '', 'no_calls': 'Total number of calls'},
             title=f"Total number of calls by advisor ({period})"
         )
 
-        fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        # fig.update_layout(yaxis={'categoryorder':'total ascending'})
+        fig.update_layout(xaxis={'categoryorder':'total descending'})
+        fig.update_xaxes(tickangle=45)
 
         return fig
 

@@ -82,6 +82,11 @@ DATA_FILE = get_data_file()
 advisors = get_as_dataframe(DATA_FILE.worksheet('advisors'))
 countries = get_as_dataframe(DATA_FILE.worksheet('countries'))
 types = get_as_dataframe(DATA_FILE.worksheet('types')).type.to_list()
+risk_matrix = get_as_dataframe(DATA_FILE.worksheet('risk_matrix'))
+programmes = get_as_dataframe(DATA_FILE.worksheet('programmes'))
+programmes['start_year'] = pd.to_datetime(programmes.start_year, format="%Y", errors='coerce')
+programmes['end_year'] = pd.to_datetime(programmes.end_year, format="%Y", errors='coerce')
+programmes = programmes.sort_values(by=['end_year', 'start_year'])
 
 def import_calendar():
     calendar = DATA_FILE.worksheet('calendar')
