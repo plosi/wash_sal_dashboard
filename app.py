@@ -132,7 +132,7 @@ app_ui = ui.page_navbar(
             ui.row(
                 ui.column(
                     4,
-                    ui.output_ui('select_year_start_programmes'),
+                    # ui.output_ui('select_year_start_programmes'),
                     ui.output_ui('select_year_end_programmes'),
                     ui.input_switch(id='programmes_donor_switch', label='By Donor')
                 ),
@@ -726,12 +726,14 @@ def server(input, output, session):
 
     @render_widget
     def map_programmes():
-        min_year = input.select_year_start_programmes_()
+        # min_year = input.select_year_start_programmes_()
         max_year = input.select_year_end_programmes_()
         df = programmes.copy()
-        period = f"{min_year} - {max_year}"
+        # period = f"{min_year} - {max_year}"
 
-        df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year <= int(max_year))]
+        ## Group by country and filter by date (only projects still active)
+        df = df[df.end_year.dt.year >= int(max_year)]
+        # df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year >= int(max_year))]
         df = df.groupby(['country','sub_sector']).agg({'code':'count'}).reset_index().rename(columns={'code':'no_programmes'})
         
 
@@ -751,22 +753,25 @@ def server(input, output, session):
             size="no_programmes",
             projection="natural earth",
             opacity=1,
-            title=f"WASH/Engineering Programmes ({period})"
+            title=f"WASH/Engineering Programmes (active as of {max_year})"
+            # title=f"WASH/Engineering Programmes ({period})"
         )
 
         return fig
 
     @render_widget
     def plot_programmes():
-        min_year = input.select_year_start_programmes_()
+        # min_year = input.select_year_start_programmes_()
         max_year = input.select_year_end_programmes_()
         
         donor_switch = input.programmes_donor_switch()
         df = programmes.copy()
 
-        ## Group by country and filter by date
-        df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year <= int(max_year))]
-        period = f"{min_year} - {max_year}"
+        ## Group by country and filter by date (only projects still active)
+        # df = df[(df.start_year.dt.year >= int(min_year)) & (df.end_year.dt.year >= int(max_year))]
+        df = df[df.end_year.dt.year >= int(max_year)]
+        # period = f"{min_year} - {max_year}"
+
         if not donor_switch:
             data = df.groupby(['country','sub_sector']).agg({'code':'count'}).reset_index().rename(columns={'code':'no_programmes'})
             labels = {'country': '', 'no_programmes': 'Total number of programmes', 'sub_sector': 'Sector'}
@@ -783,7 +788,8 @@ def server(input, output, session):
             color=color,
             color_discrete_sequence=px.colors.sequential.Plasma_r,
             labels=labels,
-            title=f"Total number of programmes with WASH/Engineering component by country ({period})"
+            # title=f"Total number of programmes with WASH/Engineering component by country ({period})"
+            title=f"Total number of programmes with WASH/Engineering component by country (active as of {max_year})"
         )
 
         fig.update_layout(xaxis={'categoryorder':'total descending'})
@@ -1083,6 +1089,7 @@ def server(input, output, session):
         # fig.update_layout(yaxis={'categoryorder':'total ascending'})
         fig.update_layout(xaxis={'categoryorder':'total descending'})
         fig.update_xaxes(tickangle=45)
+        fig.update_coloraxes(showscale=False)
 
         return fig
 
